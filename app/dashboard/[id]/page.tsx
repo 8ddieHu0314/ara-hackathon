@@ -4,6 +4,7 @@ import { getPostWithVariants } from "@/lib/queries";
 import { PLATFORM_META } from "@/lib/platforms";
 import { compact, relativeTime } from "@/lib/format";
 import { PlatformBadge } from "@/components/platform-badge";
+import { ImpressionsChart } from "@/components/impressions-chart";
 import type { VariantStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,10 @@ export default async function PostDetail({
         <p className="whitespace-pre-wrap text-sm text-white">
           {post.original_text}
         </p>
+      </div>
+
+      <div className="mb-8">
+        <ImpressionsChart variants={post.variants} />
       </div>
 
       <h2 className="mb-4 text-lg font-semibold">Per-platform breakdown</h2>
