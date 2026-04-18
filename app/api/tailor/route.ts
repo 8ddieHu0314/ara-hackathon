@@ -1,4 +1,4 @@
-import { tailorVariants } from "@/lib/ara";
+import { hasAraAgent, mockTailor, tailorVariants } from "@/lib/ara";
 import { PLATFORMS } from "@/lib/platforms";
 import type { Platform } from "@/lib/types";
 
@@ -29,6 +29,10 @@ export async function POST(request: Request) {
       : PLATFORMS;
 
   const platforms = requested.length > 0 ? requested : PLATFORMS;
+
+  if (!hasAraAgent()) {
+    return Response.json({ variants: mockTailor(text, platforms), mocked: true });
+  }
 
   try {
     const variants = await tailorVariants(text, platforms);
