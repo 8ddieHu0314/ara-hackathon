@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # Relay — hackathon notes
 
-Relay is a Next.js 16 (App Router) + React 19 + Supabase + Ara Cloud API hackathon project. Founders paste a raw post, Ara tailors it per-platform, user reviews, one click publishes to LinkedIn, X, Reddit (X is mocked; LinkedIn/Reddit go through an Ara agent with connector tools).
+Relay is a Next.js 16 (App Router) + React 19 + Ara Cloud API hackathon project. Founders paste a raw post, Ara tailors it per-platform, user reviews, one click publishes to LinkedIn, X, Reddit (X is mocked; LinkedIn/Reddit go through an Ara agent with connector tools). Posts persist to a local JSON file — no database.
 
 ## Commands
 
@@ -24,7 +24,7 @@ Two-screen app: a compose screen (`app/page.tsx` → `components/compose.tsx`) a
 1. Client POSTs raw text + selected platforms to `app/api/tailor/route.ts`.
 2. If `hasAraAgent()` returns false, the route returns `mockTailor` output — otherwise it calls `tailorVariants`, which hits `POST /v1/agents/{ARA_AGENT_ID}/chat` with Bearer `ARA_AGENT_KEY` and parses strict JSON keyed by platform out of the agent's reply.
 3. User edits the variants, then client POSTs them to `app/api/publish/route.ts`.
-4. That route inserts a `posts` row, then in parallel calls `publishViaAraAgent` per platform (X is hard-coded to mock). The Ara agent is instructed to return a single-line JSON `{ok,url,error}` which the route parses. Successful variants get seeded mock metrics from `lib/mock-metrics.ts` and are inserted into `post_variants`.
+4. That route calls `publishViaAraAgent` per platform in parallel (X is hard-coded to mock). The Ara agent is instructed to return a single-line JSON `{ok,url,error}` which the route parses. Successful variants get seeded mock metrics from `lib/mock-metrics.ts`, then the whole post+variants bundle is written via `createPostWithVariants` from `lib/store.ts`.
 
 ### Ara integration points (`lib/ara.ts`)
 
@@ -37,20 +37,19 @@ Two-layer auth: account-scoped `ARA_API_KEY` is only used for agent/app **manage
 
 ### Data layer
 
-- Service-role Supabase client in `lib/supabase.ts` (lazy singleton, `persistSession: false`). API routes use it directly — RLS is intentionally not set up; this is a single-tenant demo.
-- Schema lives in `supabase/schema.sql` (`posts`, `post_variants` with unique `(post_id, platform)`). Run once in the Supabase SQL editor.
-- Reads go through `lib/queries.ts` (used by server components in `app/dashboard/*`).
+- `lib/store.ts` — file-backed store at `./data/store.json` (gitignored). Writes are serialized through an in-process promise lock and use atomic rename. Exposes `createPostWithVariants`, `listPostsWithVariants`, `getPostWithVariants`.
+- `lib/queries.ts` re-exports the read helpers; server components in `app/dashboard/*` import from there.
+- Delete `data/store.json` to reset the demo.
 
 ### Platform config
 
-`lib/platforms.ts` is the single source of truth for platform identity, char limits, and the style guidance fed into the tailor prompt. Adding/removing a platform means editing this file, the `Platform` union in `lib/types.ts`, and the schema's `check` constraint.
+`lib/platforms.ts` is the single source of truth for platform identity, char limits, and the style guidance fed into the tailor prompt. Adding/removing a platform means editing this file and the `Platform` union in `lib/types.ts`.
 
 ## Demo safety nets
 
-- Missing Supabase env: dashboard still renders with an inline error and empty state.
 - Missing Ara agent env: `/api/tailor` returns `mockTailor` output; `/api/publish` mocks every platform — the UI still flows through to the dashboard.
 - X posting is always mocked — do not wire a real X connector without also updating `app/api/publish/route.ts`.
 
 ## Required env (`.env.local`)
 
-`ARA_API_KEY`, `ARA_API_BASE_URL` (optional, defaults to `https://api.ara.so`), `ARA_AGENT_ID`, `ARA_AGENT_KEY` (both required for real Ara calls; otherwise mock mode), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`. See `.env.local.example` for the exact curl commands that mint `ARA_AGENT_ID` and `ARA_AGENT_KEY`.
+`ARA_API_KEY`, `ARA_API_BASE_URL` (optional, defaults to `https://api.ara.so`), `ARA_AGENT_ID`, `ARA_AGENT_KEY` (both required for real Ara calls; otherwise mock mode). No database env — posts persist to `data/store.json`. See `.env.local.example` for the exact curl commands that mint `ARA_AGENT_ID` and `ARA_AGENT_KEY`.
