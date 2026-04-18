@@ -6,50 +6,84 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # Signal — hackathon notes
 
-Signal is a Next.js 16 (App Router) + React 19 + Ara Cloud API hackathon project. Founders paste a raw post, Ara tailors it per-platform, user reviews, one click publishes to LinkedIn, X, Reddit (X is mocked; LinkedIn/Reddit go through an Ara agent with connector tools). Posts persist to a local JSON file — no database.
+Signal is a split-architecture hackathon project:
+
+- **Frontend**: Next.js 16 (App Router) + React 19. UI only. `app/api/*` routes are thin proxies to the Python backend. No Ara logic, no persistence.
+- **Backend**: Python FastAPI in `backend/`. Owns the JSON store at `backend/data/store.json` and all Ara Cloud API calls.
+- **Ara Automation**: `backend/poster.py`, deployed to Ara's sandbox via the `ara` CLI. This is the only surface that can call Composio connector tools (LinkedIn, Reddit).
 
 ## Commands
 
-- `npm run dev` — start Next.js dev server on http://localhost:3000
+Frontend (repo root):
+- `npm run dev` — Next.js dev server on http://localhost:3000
 - `npm run build` — production build
-- `npm run start` — run the production build
-- `npm run lint` — ESLint (`eslint-config-next`)
+- `npm run lint` — ESLint
 
-No test runner is configured.
+Backend (`backend/`):
+- `source .venv/bin/activate && set -a && . .env && set +a`
+- `uvicorn main:app --reload --port 8000` — FastAPI
+- `ara deploy poster.py` — deploy the Automation (one-time per code change)
 
 ## Architecture
 
-Two-screen app: a compose screen (`app/page.tsx` → `components/compose.tsx`) and a dashboard (`app/dashboard/page.tsx`, `app/dashboard/[id]/page.tsx`). The flow is:
+```
+Browser → Next.js :3000 → FastAPI :8000 → api.ara.so
+                                           ├── /v1/agents/{id}/chat  (tailoring)
+                                           └── /v1/apps/{id}/run     (posting via poster.py)
+```
 
-1. Client POSTs raw text + selected platforms to `app/api/tailor/route.ts`.
-2. If `hasAraAgent()` returns false, the route returns `mockTailor` output — otherwise it calls `tailorVariants`, which hits `POST /v1/agents/{ARA_AGENT_ID}/chat` with Bearer `ARA_AGENT_KEY` and parses strict JSON keyed by platform out of the agent's reply.
-3. User edits the variants, then client POSTs them to `app/api/publish/route.ts`.
-4. That route calls `publishViaAraAgent` per platform in parallel (X is hard-coded to mock). The Ara agent is instructed to return a single-line JSON `{ok,url,error}` which the route parses. Successful variants get seeded mock metrics from `lib/mock-metrics.ts`, then the whole post+variants bundle is written via `createPostWithVariants` from `lib/store.ts`.
+### Why the split
 
-### Ara integration points (`lib/ara.ts`)
+The `/v1/agents/{id}/chat` endpoint is a plain LLM gateway — no sandbox, no connector access. Only deployed Automations (`/v1/apps/{id}/run`) run inside Ara's sandbox where runtime connector tools (LINKEDIN_CREATE_LINKED_IN_POST, REDDIT_SUBMIT_POST, etc.) are auto-available.
 
-Two-layer auth: account-scoped `ARA_API_KEY` is only used for agent/app **management** endpoints (`/agents`, `/agents/{id}/keys`). Runtime chat against `/v1/agents/{id}/chat` requires an **agent-scoped** key (`ak_live_...`) in `ARA_AGENT_KEY`. The `/llm/v1/chat/completions` endpoint is for Ara's internal sandbox and cannot be called with either — don't reintroduce it.
+Splitting into a Python backend lets us use `ara-sdk` and the `ara` CLI idiomatically for authoring + deploying the Automation.
 
-- `agentChat` — shared helper, POSTs messages to `/v1/agents/{ARA_AGENT_ID}/chat` with Bearer `ARA_AGENT_KEY`. Returns OpenAI-shaped `choices[0].message.content`. Throws if either env is missing.
-- `tailorVariants` — wraps `agentChat` with a per-platform system prompt and parses the JSON reply. Strips ``` fences, falls back to regex-extracting the first `{...}` block.
-- `publishViaAraAgent` — wraps `agentChat` with a "use the LinkedIn/Reddit connector to post this" instruction. Tool hints: `LINKEDIN_CREATE_LINKED_IN_POST`, `REDDIT_SUBMIT_POST`.
-- `hasAraAgent()` / `mockTailor()` / `mockUrl()` — fallback helpers so tailoring and publishing both degrade cleanly when `ARA_AGENT_ID` or `ARA_AGENT_KEY` is unset.
+### Frontend → Backend boundary
+
+- `lib/backend.ts` — `backendFetch(path, init)` wraps fetch with `BACKEND_URL` (default `http://localhost:8000`).
+- `lib/queries.ts` — server-component reads: `listPostsWithVariants`, `getPostWithVariants`, both hit FastAPI `/posts`.
+- `app/api/tailor/route.ts`, `app/api/publish/route.ts` — one-liner proxies that stream the request body to FastAPI and forward the response.
+
+### Backend flow (`backend/main.py`)
+
+1. `POST /tailor` → builds a system prompt per `platforms.py` style strings, calls `POST /v1/agents/{ARA_AGENT_ID}/chat` with Bearer `ARA_AGENT_KEY`, strict-JSON parses per-platform. Falls back to `_mock_tailor` if agent env is missing.
+2. `POST /publish` → for each variant, runs `_publish_one`:
+   - X → always mocked
+   - LinkedIn / Reddit → `POST /v1/apps/{ARA_APP_ID}/run` with Bearer `ARA_APP_KEY` and `{"input":{"platform","content"}}`. The Automation returns a one-line JSON `{ok,url,error}` which the backend parses out of the response envelope.
+   - If `ARA_APP_ID` / `ARA_APP_KEY` are empty, LinkedIn/Reddit mock cleanly.
+3. Successful variants get `seed_metrics(platform)` mock numbers, then the whole post+variants bundle is written via `create_post_with_variants` in `store.py`.
+
+### Automation (`backend/poster.py`)
+
+Single `ara.Automation("signal-poster", system_instructions=...)`. Connector tools are enabled by default (`allow_connector_tools=True`). The instructions tell the model to call `LINKEDIN_CREATE_LINKED_IN_POST` or `REDDIT_SUBMIT_POST` based on the `platform` field in the input payload, then reply with a one-line JSON envelope.
+
+Deploying: `ara deploy poster.py` returns `app_id` + runtime key — populate `ARA_APP_ID` and `ARA_APP_KEY` in `backend/.env`.
 
 ### Data layer
 
-- `lib/store.ts` — file-backed store at `./data/store.json` (gitignored). Writes are serialized through an in-process promise lock and use atomic rename. Exposes `createPostWithVariants`, `listPostsWithVariants`, `getPostWithVariants`.
-- `lib/queries.ts` re-exports the read helpers; server components in `app/dashboard/*` import from there.
-- Delete `data/store.json` to reset the demo.
+- `backend/store.py` — async JSON store at `backend/data/store.json` (gitignored). Async lock + atomic rename (temp file + `os.replace`).
+- No database. Delete the file to reset the demo.
 
 ### Platform config
 
-`lib/platforms.ts` is the single source of truth for platform identity, char limits, and the style guidance fed into the tailor prompt. Adding/removing a platform means editing this file and the `Platform` union in `lib/types.ts`.
+- Backend: `backend/main.py` holds `PLATFORM_META` + `PLATFORM_STYLE` (what goes into the tailor prompt).
+- Frontend: `lib/platforms.ts` holds `PLATFORM_META` + `PLATFORM_STYLE` for UI-side char counters and pill labels.
+
+These are duplicated intentionally — the backend owns what Ara sees, the frontend owns what the user sees. Keep them in sync when editing.
+
+## Environment
+
+**Root `.env`** — frontend only:
+- `BACKEND_URL` (optional, defaults to `http://localhost:8000`)
+
+**`backend/.env`** — everything else:
+- `ARA_API_KEY`, `ARA_API_BASE_URL` (optional)
+- `ARA_AGENT_ID`, `ARA_AGENT_KEY` — required for real tailoring
+- `ARA_APP_ID`, `ARA_APP_KEY` — required for real LinkedIn/Reddit posting
+- `ARA_STORE_PATH` (optional, defaults to `./data/store.json`)
 
 ## Demo safety nets
 
-- Missing Ara agent env: `/api/tailor` returns `mockTailor` output; `/api/publish` mocks every platform — the UI still flows through to the dashboard.
-- X posting is always mocked — do not wire a real X connector without also updating `app/api/publish/route.ts`.
-
-## Required env (`.env.local`)
-
-`ARA_API_KEY`, `ARA_API_BASE_URL` (optional, defaults to `https://api.ara.so`), `ARA_AGENT_ID`, `ARA_AGENT_KEY` (both required for real Ara calls; otherwise mock mode). No database env — posts persist to `data/store.json`. See `.env.local.example` for the exact curl commands that mint `ARA_AGENT_ID` and `ARA_AGENT_KEY`.
+- Missing Ara agent env → `/tailor` returns `_mock_tailor` output.
+- Missing Ara app env → `/publish` mocks LinkedIn/Reddit.
+- X posting is always mocked — do not wire a real X connector without updating `backend/main.py`.

@@ -2,71 +2,107 @@
 
 > One post, every platform. Draft once, let Ara tailor it for LinkedIn, X, and Reddit, then publish with a single click.
 
-Built for the Ara hackathon. Next.js 16 + the Ara Cloud API. Posts are persisted to a local JSON file (`data/store.json`) — no database required.
+Built for the Ara hackathon.
+
+## Architecture
+
+```
+Browser
+  ↓
+Next.js 16 frontend (port 3000) — UI only; API routes are thin proxies
+  ↓
+Python FastAPI backend (port 8000) — owns the JSON store and all Ara calls
+  ↓
+Ara Cloud (api.ara.so)
+  ├── /v1/agents/{id}/chat        → per-platform tailoring (Sonnet 4.6)
+  └── /v1/apps/{id}/run           → deployed `poster.py` Automation posts
+                                    via LinkedIn + Reddit connectors
+```
 
 ## What it does
 
 1. **Paste** a raw post (any tone, any length).
-2. **Tailor with Ara** — the Ara LLM gateway rewrites it in the native style of each platform (professional storytelling for LinkedIn, punchy hook for X, community-first for Reddit).
-3. **Review & edit** each variant. Per-platform character counters.
-4. **Publish**. LinkedIn and Reddit post through your connected Ara agent; X is mocked for the demo.
-5. **Dashboard** — per-post, per-platform breakdown of (mocked) impressions, likes, comments, shares.
-
-## How Ara is used
-
-- `POST /v1/agents/{agent_id}/chat` — Signal sends every LLM call through an Ara agent. The agent generates the three platform-specific drafts, and (when LinkedIn/Reddit connectors are enabled on it) calls the matching connector tools to post the approved content.
-- If `ARA_AGENT_ID` or `ARA_AGENT_KEY` is not set, every platform falls back to a mock publish so the demo still works end-to-end without connector setup.
+2. **Tailor with Signal** — Ara rewrites it in the native style of each platform.
+3. **Review & edit** each variant.
+4. **Publish**. LinkedIn and Reddit go through a deployed Ara Automation with connector access; X is mocked.
+5. **Dashboard** — per-post breakdown with seeded mock metrics.
 
 ## Setup
 
-### 1. Ara
-
-1. Sign in at `app.ara.so` and grab an account API key → that's `ARA_API_KEY`.
-2. In `app.ara.so`, connect the **LinkedIn** and **Reddit** toolkits (OAuth).
-3. Create an **Agent** with those connectors enabled — `.env.local.example` shows the exact curl commands to mint the agent and its runtime key.
-4. *(Optional — skip this and every platform mocks cleanly.)*
-
-### 2. Environment
+### 1. Python backend
 
 ```bash
-cp .env.local.example .env.local
-# fill in values
+cd backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+cp .env.example .env
+# fill in ARA_API_KEY, ARA_AGENT_ID, ARA_AGENT_KEY
+
+# Deploy the Automation that does the actual posting.
+# This uploads poster.py to the Ara sandbox so it can call connector tools.
+set -a && . .env && set +a
+ara deploy poster.py
+#   -> copy the printed app_id + runtime key into .env as
+#      ARA_APP_ID and ARA_APP_KEY
 ```
 
-### 3. Run
+Also make sure LinkedIn and Reddit are connected on your Ara account at https://app.ara.so.
+
+### 2. Frontend
 
 ```bash
+# root of the repo
 npm install
+cp .env.local.example .env.local   # optional; only if you change backend URL
+```
+
+## Run
+
+```bash
+# terminal 1 — backend
+cd backend && source .venv/bin/activate && set -a && . .env && set +a
+uvicorn main:app --reload --port 8000
+
+# terminal 2 — frontend
 npm run dev
 ```
 
 Open <http://localhost:3000>.
 
-Posts you publish land in `data/store.json`. Delete the file to reset the demo.
+## Degradation behavior
+
+- **No Ara agent configured** (no `ARA_AGENT_ID` / `ARA_AGENT_KEY`): tailoring returns a labelled placeholder per platform.
+- **Ara agent but no deployed Automation** (no `ARA_APP_ID` / `ARA_APP_KEY`): tailoring works via real Ara, publishing to LinkedIn/Reddit mocks out.
+- **X** is always mocked.
 
 ## File map
 
 ```
+backend/
+  main.py          FastAPI — /tailor, /publish, /posts, /posts/{id}, /health
+  store.py         async JSON store, file-backed (data/store.json)
+  mock_metrics.py  seeded per-platform metric jitter
+  poster.py        Ara Automation — deployed via `ara deploy`
+  requirements.txt fastapi, uvicorn, httpx, pydantic, ara-sdk
+  .env.example
 app/
-  api/tailor/route.ts    POST raw text -> Ara agent -> 3 variants
-  api/publish/route.ts   POST variants -> Ara agent posts + local JSON persist
-  page.tsx               compose screen
-  dashboard/page.tsx     list of posts + aggregate metrics
-  dashboard/[id]/page.tsx per-post breakdown
+  page.tsx                compose screen
+  api/tailor/route.ts     proxies to FastAPI /tailor
+  api/publish/route.ts    proxies to FastAPI /publish
+  dashboard/page.tsx      server component — fetches /posts from FastAPI
+  dashboard/[id]/page.tsx server component — fetches /posts/{id}
 components/
-  compose.tsx            draft -> review -> publish flow
-  platform-badge.tsx
+  compose.tsx platform-badge.tsx
 lib/
-  ara.ts                 Ara agent chat client (tailoring + publishing)
-  store.ts               file-backed post/variant store (data/store.json)
-  queries.ts             read helpers re-exported from store.ts
-  platforms.ts           per-platform style prompts + char limits
-  mock-metrics.ts        seeded per-platform metric jitter
-  types.ts, format.ts, cn.ts
+  backend.ts      fetch helper with BACKEND_URL env
+  queries.ts      server-side reads that hit FastAPI /posts
+  platforms.ts    char limits + style prompts (shared shape with backend)
+  types.ts format.ts cn.ts
 ```
 
-## Demo tips
+## Reset
 
-- Click **Try example** on the compose screen for a realistic founder-style draft.
-- Toggle platforms off with the pills if you want to publish to a subset.
-- Without Ara credentials, publishing still works — every variant ends up with status `Mocked` and seeded analytics so the dashboard is populated.
+```bash
+rm backend/data/store.json
+```
