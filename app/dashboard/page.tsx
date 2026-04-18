@@ -29,7 +29,7 @@ export default async function DashboardPage() {
   );
 
   return (
-    <div className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
+    <div className="w-full flex-1 px-12 py-10">
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>

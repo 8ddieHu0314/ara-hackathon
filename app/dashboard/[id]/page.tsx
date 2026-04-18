@@ -18,7 +18,7 @@ export default async function PostDetail({
   if (!post) notFound();
 
   return (
-    <div className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
+    <div className="w-full flex-1 px-12 py-10">
       <div className="mb-6">
         <Link
           href="/dashboard"

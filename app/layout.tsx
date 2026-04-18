@@ -19,7 +19,7 @@ export default function RootLayout({
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <header className="border-b border-[var(--card-border)] bg-[var(--background)]">
-          <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
+          <div className="flex w-full items-center justify-between px-12 py-4">
             <Link href="/" className="flex items-center gap-2">
               <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent)] text-[var(--background)] font-bold">
                 S
