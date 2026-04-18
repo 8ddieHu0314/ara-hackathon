@@ -2,6 +2,8 @@ import Link from "next/link";
 import { listPostsWithVariants } from "@/lib/queries";
 import { PLATFORM_META } from "@/lib/platforms";
 import { compact, relativeTime } from "@/lib/format";
+import { buildInsights } from "@/lib/insights";
+import { InsightsPanel } from "@/components/insights-panel";
 import type { PostWithVariants } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +59,8 @@ export default async function DashboardPage() {
         <Stat label="Total comments" value={compact(totals.comments)} />
         <Stat label="Total shares" value={compact(totals.shares)} />
       </div>
+
+      <InsightsPanel insights={buildInsights(posts)} />
 
       {posts.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--card-border)] p-12 text-center">
