@@ -18,22 +18,46 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <header className="border-b border-[var(--card-border)] bg-[var(--background)]">
+        <header className="sticky top-0 z-20 border-b border-[var(--card-border)] bg-[var(--background)]/80 backdrop-blur-xl">
           <div className="flex w-full items-center justify-between px-12 py-4">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent)] text-[var(--background)] font-bold">
-                S
+            <Link href="/" className="group flex items-center gap-3">
+              <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 text-[#0a0a0b] font-bold shadow-[0_0_20px_rgba(249,115,22,0.35)] transition-transform group-hover:scale-105">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path
+                    d="M3 12c0-5 4-9 9-9s9 4 9 9"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M7 12c0-3 2-5 5-5s5 2 5 5"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                  <circle cx="12" cy="12" r="2" fill="currentColor" />
+                </svg>
               </div>
-              <span className="text-lg font-semibold tracking-tight">Signal</span>
-              <span className="ml-2 rounded-full border border-[var(--card-border)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--muted)]">
-                powered by ara
-              </span>
+              <div className="flex flex-col">
+                <span className="text-lg font-semibold leading-none tracking-tight">
+                  Signal
+                </span>
+                <span className="mt-1 text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">
+                  powered by ara
+                </span>
+              </div>
             </Link>
-            <nav className="flex gap-6 text-sm">
-              <Link href="/" className="text-[var(--muted)] hover:text-white transition">
+            <nav className="flex items-center gap-1 rounded-full border border-[var(--card-border)] bg-[var(--card)] p-1 text-sm">
+              <Link
+                href="/"
+                className="rounded-full px-4 py-1.5 text-[var(--muted)] transition hover:text-white"
+              >
                 Compose
               </Link>
-              <Link href="/dashboard" className="text-[var(--muted)] hover:text-white transition">
+              <Link
+                href="/dashboard"
+                className="rounded-full px-4 py-1.5 text-[var(--muted)] transition hover:text-white"
+              >
                 Dashboard
               </Link>
             </nav>

@@ -18,38 +18,51 @@ export default async function PostDetail({
   const post = await getPostWithVariants(id);
   if (!post) notFound();
 
+  const totalImpressions = post.variants.reduce((a, v) => a + v.impressions, 0);
+
   return (
     <div className="w-full flex-1 px-12 py-10">
-      <div className="mb-6">
+      <div className="mb-6 animate-fade-up">
         <Link
           href="/dashboard"
-          className="text-sm text-[var(--muted)] hover:text-white"
+          className="inline-flex items-center gap-1 text-sm text-[var(--muted)] transition hover:text-white"
         >
-          ← All posts
+          <span aria-hidden>←</span> All posts
         </Link>
       </div>
 
-      <div className="mb-8 rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-5">
-        <div className="mb-2 flex items-center gap-3 text-xs text-[var(--muted)]">
-          <span>Original draft</span>
-          <span>•</span>
+      <div className="mb-8 animate-fade-up rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-6">
+        <div className="mb-3 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.15em] text-[var(--muted)]">
+          <span className="rounded-full border border-[var(--card-border)] bg-[var(--background)] px-2 py-0.5">
+            Original draft
+          </span>
           <span>{relativeTime(post.created_at)}</span>
+          <span className="text-[var(--muted)]">·</span>
+          <span className="font-mono">
+            {compact(totalImpressions)} total impressions
+          </span>
         </div>
-        <p className="whitespace-pre-wrap text-sm text-white">
+        <p className="whitespace-pre-wrap text-base leading-relaxed text-white">
           {post.original_text}
         </p>
       </div>
 
-      <div className="mb-8">
+      <div className="mb-8 animate-fade-up" style={{ animationDelay: "60ms" }}>
         <ImpressionsChart variants={post.variants} />
       </div>
 
-      <h2 className="mb-4 text-lg font-semibold">Per-platform breakdown</h2>
+      <h2
+        className="mb-4 animate-fade-up text-lg font-semibold tracking-tight"
+        style={{ animationDelay: "120ms" }}
+      >
+        Per-platform breakdown
+      </h2>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {post.variants.map((v) => (
+        {post.variants.map((v, i) => (
           <div
             key={v.id}
-            className="flex flex-col rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4"
+            className="flex animate-fade-up flex-col rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-4 transition hover:border-[var(--card-border-strong)]"
+            style={{ animationDelay: `${160 + i * 50}ms` }}
           >
             <div className="mb-3 flex items-center justify-between">
               <PlatformBadge platform={v.platform} />
