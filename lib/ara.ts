@@ -2,47 +2,52 @@ import type { Platform } from "./types";
 import { PLATFORM_META, PLATFORM_STYLE } from "./platforms";
 
 const DEFAULT_BASE = "https://api.ara.so";
-const DEFAULT_MODEL = "anthropic/claude-sonnet-4-20250514";
 
 function baseUrl(): string {
   return (process.env.ARA_API_BASE_URL ?? DEFAULT_BASE).replace(/\/+$/, "");
 }
 
-function apiKey(): string {
-  const k = process.env.ARA_API_KEY;
-  if (!k) throw new Error("ARA_API_KEY is not set");
-  return k;
-}
-
-function model(): string {
-  return process.env.ARA_MODEL ?? DEFAULT_MODEL;
+function agentAuth(): { agentId: string; agentKey: string } | null {
+  const agentId = process.env.ARA_AGENT_ID?.trim();
+  const agentKey = process.env.ARA_AGENT_KEY?.trim();
+  if (!agentId || !agentKey) return null;
+  return { agentId, agentKey };
 }
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
-async function chat(messages: ChatMessage[]): Promise<string> {
-  const res = await fetch(`${baseUrl()}/llm/v1/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey()}`,
+async function agentChat(messages: ChatMessage[]): Promise<string> {
+  const auth = agentAuth();
+  if (!auth) {
+    throw new Error(
+      "Ara agent not configured. Set ARA_AGENT_ID and ARA_AGENT_KEY in .env.local.",
+    );
+  }
+  const res = await fetch(
+    `${baseUrl()}/v1/agents/${encodeURIComponent(auth.agentId)}/chat`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${auth.agentKey}`,
+      },
+      body: JSON.stringify({ messages, stream: false }),
     },
-    body: JSON.stringify({
-      model: model(),
-      messages,
-      stream: false,
-      temperature: 0.7,
-    }),
-  });
+  );
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Ara LLM gateway ${res.status}: ${body.slice(0, 400)}`);
+    throw new Error(`Ara agent ${res.status}: ${body.slice(0, 400)}`);
   }
   const data = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
+    message?: { content?: string };
+    content?: string;
   };
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("Ara LLM response missing content");
+  const content =
+    data.choices?.[0]?.message?.content ??
+    data.message?.content ??
+    data.content;
+  if (!content) throw new Error("Ara agent response missing content");
   return content;
 }
 
@@ -73,7 +78,7 @@ export async function tailorVariants(
   raw: string,
   platforms: Platform[],
 ): Promise<Record<Platform, string>> {
-  const content = await chat(buildTailorPrompt(raw, platforms));
+  const content = await agentChat(buildTailorPrompt(raw, platforms));
   const stripped = content
     .trim()
     .replace(/^```(?:json)?/i, "")
@@ -84,7 +89,11 @@ export async function tailorVariants(
     parsed = JSON.parse(stripped);
   } catch {
     const match = stripped.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error(`Could not parse Ara response as JSON: ${stripped.slice(0, 200)}`);
+    if (!match) {
+      throw new Error(
+        `Could not parse Ara response as JSON: ${stripped.slice(0, 200)}`,
+      );
+    }
     parsed = JSON.parse(match[0]);
   }
   if (!parsed || typeof parsed !== "object") {
@@ -112,18 +121,14 @@ export async function publishViaAraAgent(
   platform: Platform,
   content: string,
 ): Promise<PublishResult> {
-  const agentId = process.env.ARA_AGENT_ID;
-  if (!agentId) {
-    return {
-      ok: true,
-      mocked: true,
-      url: mockUrl(platform),
-    };
+  if (!agentAuth()) {
+    return { ok: true, mocked: true, url: mockUrl(platform) };
   }
 
-  const toolHint = platform === "linkedin"
-    ? "Use the LinkedIn connector (e.g. LINKEDIN_CREATE_LINKED_IN_POST) to post the exact content verbatim to the connected account."
-    : "Use the Reddit connector (e.g. REDDIT_SUBMIT_POST) to submit the exact content verbatim to the connected account. If a subreddit is required, pick a reasonable default such as 'u_' + username (the user's personal profile).";
+  const toolHint =
+    platform === "linkedin"
+      ? "Use the LinkedIn connector (e.g. LINKEDIN_CREATE_LINKED_IN_POST) to post the exact content verbatim to the connected account."
+      : "Use the Reddit connector (e.g. REDDIT_SUBMIT_POST) to submit the exact content verbatim to the connected account. If a subreddit is required, pick a reasonable default such as 'u_' + username (the user's personal profile).";
 
   const instruction = `Please post the following content to ${platform} now.
 
@@ -137,34 +142,7 @@ ${content}
 """`;
 
   try {
-    const res = await fetch(
-      `${baseUrl()}/v1/agents/${encodeURIComponent(agentId)}/chat`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey()}`,
-        },
-        body: JSON.stringify({
-          messages: [{ role: "user", content: instruction }],
-          stream: false,
-        }),
-      },
-    );
-    if (!res.ok) {
-      const body = await res.text();
-      return { ok: false, mocked: false, error: `Ara agent ${res.status}: ${body.slice(0, 300)}` };
-    }
-    const data = (await res.json()) as {
-      content?: string;
-      message?: { content?: string };
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const text =
-      data.content ??
-      data.message?.content ??
-      data.choices?.[0]?.message?.content ??
-      "";
+    const text = await agentChat([{ role: "user", content: instruction }]);
     const match = text.match(/\{[\s\S]*\}/);
     if (match) {
       try {
@@ -180,7 +158,7 @@ ${content}
           mocked: false,
         };
       } catch {
-        // fall through
+        // fall through to generic success
       }
     }
     return { ok: true, mocked: false };
@@ -196,6 +174,26 @@ ${content}
 export function mockUrl(platform: Platform): string {
   const id = Math.random().toString(36).slice(2, 10);
   if (platform === "x") return `https://x.com/demo/status/${id}`;
-  if (platform === "linkedin") return `https://www.linkedin.com/feed/update/demo-${id}`;
+  if (platform === "linkedin")
+    return `https://www.linkedin.com/feed/update/demo-${id}`;
   return `https://reddit.com/r/demo/comments/${id}`;
+}
+
+export function mockTailor(
+  raw: string,
+  platforms: Platform[],
+): Record<Platform, string> {
+  const trimmed = raw.trim();
+  const result = {} as Record<Platform, string>;
+  for (const p of platforms) {
+    const limit = PLATFORM_META[p].charLimit;
+    const label = PLATFORM_META[p].label;
+    const base = `[${label} draft — Ara not configured]\n\n${trimmed}`;
+    result[p] = base.length > limit ? base.slice(0, limit - 3) + "..." : base;
+  }
+  return result;
+}
+
+export function hasAraAgent(): boolean {
+  return agentAuth() !== null;
 }
