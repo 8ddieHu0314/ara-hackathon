@@ -122,7 +122,7 @@ export default function Compose() {
               }
               className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {tailorLoading ? "Tailoring…" : hasVariants ? "Re-tailor" : "Tailor with Ara"}
+              {tailorLoading ? "Tailoring…" : hasVariants ? "Re-tailor" : "Tailor with Signal"}
             </button>
           </div>
         </div>
