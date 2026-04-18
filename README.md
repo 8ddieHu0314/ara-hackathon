@@ -101,6 +101,21 @@ lib/
   types.ts format.ts cn.ts
 ```
 
+## Demo seed
+
+The dashboard looks empty on a fresh clone. Populate it with 6 hand-crafted sample posts (founder tone, per-platform variants, realistic mocked metrics) by running:
+
+```bash
+npm run seed          # append/overwrite with seeded posts
+npm run seed:reset    # wipe store first, then seed
+```
+
+Or directly:
+```bash
+cd backend && source .venv/bin/activate && python seed.py           # overwrite
+cd backend && source .venv/bin/activate && python seed.py --append  # keep existing
+```
+
 ## Reset
 
 ```bash

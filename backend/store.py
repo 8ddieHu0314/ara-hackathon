@@ -8,7 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-_STORE_PATH = Path(os.environ.get("ARA_STORE_PATH", "./data/store.json")).resolve()
+_DEFAULT_STORE = Path(__file__).resolve().parent / "data" / "store.json"
+_STORE_PATH = Path(os.environ.get("ARA_STORE_PATH") or _DEFAULT_STORE).resolve()
 _LOCK = asyncio.Lock()
 
 

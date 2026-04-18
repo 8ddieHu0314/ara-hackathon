@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed": "backend/.venv/bin/python backend/seed.py",
+    "seed:reset": "rm -f backend/data/store.json && backend/.venv/bin/python backend/seed.py"
   },
   "dependencies": {
     "clsx": "^2.1.1",
