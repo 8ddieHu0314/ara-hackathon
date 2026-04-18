@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
-# Relay — hackathon notes
+# Signal — hackathon notes
 
-Relay is a Next.js 16 (App Router) + React 19 + Ara Cloud API hackathon project. Founders paste a raw post, Ara tailors it per-platform, user reviews, one click publishes to LinkedIn, X, Reddit (X is mocked; LinkedIn/Reddit go through an Ara agent with connector tools). Posts persist to a local JSON file — no database.
+Signal is a Next.js 16 (App Router) + React 19 + Ara Cloud API hackathon project. Founders paste a raw post, Ara tailors it per-platform, user reviews, one click publishes to LinkedIn, X, Reddit (X is mocked; LinkedIn/Reddit go through an Ara agent with connector tools). Posts persist to a local JSON file — no database.
 
 ## Commands
 

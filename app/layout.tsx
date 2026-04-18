@@ -7,7 +7,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Relay — one post, every platform",
+  title: "Signal — one post, every platform",
   description:
     "Write once, publish everywhere. Per-platform AI tailoring, one-click distribution, unified analytics.",
 };
@@ -22,9 +22,9 @@ export default function RootLayout({
           <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
             <Link href="/" className="flex items-center gap-2">
               <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent)] text-[var(--background)] font-bold">
-                R
+                S
               </div>
-              <span className="text-lg font-semibold tracking-tight">Relay</span>
+              <span className="text-lg font-semibold tracking-tight">Signal</span>
               <span className="ml-2 rounded-full border border-[var(--card-border)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--muted)]">
                 powered by ara
               </span>

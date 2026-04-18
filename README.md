@@ -1,4 +1,4 @@
-# Relay
+# Signal
 
 > One post, every platform. Draft once, let Ara tailor it for LinkedIn, X, and Reddit, then publish with a single click.
 
@@ -14,9 +14,8 @@ Built for the Ara hackathon. Next.js 16 + the Ara Cloud API. Posts are persisted
 
 ## How Ara is used
 
-- `POST /llm/v1/chat/completions` — Ara acts as the LLM that generates the three platform-specific drafts.
-- `POST /v1/agents/{agent_id}/chat` — Ara's agent runtime calls the LinkedIn and Reddit connector tools you enabled in `app.ara.so`, posting the approved content on your behalf.
-- If `ARA_AGENT_ID` is not set, every platform falls back to a mock publish so the demo still works end-to-end without connector setup.
+- `POST /v1/agents/{agent_id}/chat` — Signal sends every LLM call through an Ara agent. The agent generates the three platform-specific drafts, and (when LinkedIn/Reddit connectors are enabled on it) calls the matching connector tools to post the approved content.
+- If `ARA_AGENT_ID` or `ARA_AGENT_KEY` is not set, every platform falls back to a mock publish so the demo still works end-to-end without connector setup.
 
 ## Setup
 

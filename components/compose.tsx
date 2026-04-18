@@ -9,7 +9,7 @@ import { PlatformBadge } from "./platform-badge";
 
 type Variants = Partial<Record<Platform, string>>;
 
-const EXAMPLE = `Just shipped Relay — one tool to post everywhere. We built it because our founders were copy-pasting the same update to LinkedIn, X, and Reddit three times a week. Now it's one paste, three tailored drafts, one click.`;
+const EXAMPLE = `Just shipped Signal — one tool to post everywhere. We built it because our founders were copy-pasting the same update to LinkedIn, X, and Reddit three times a week. Now it's one paste, three tailored drafts, one click.`;
 
 export default function Compose() {
   const router = useRouter();
