@@ -2,7 +2,7 @@ import type { Platform } from "./types";
 import { PLATFORM_META, PLATFORM_STYLE } from "./platforms";
 
 const DEFAULT_BASE = "https://api.ara.so";
-const DEFAULT_MODEL = "anthropic/claude-sonnet-4-20250514";
+const DEFAULT_MODEL = "anthropic/claude-sonnet-4-6";
 
 function baseUrl(): string {
   return (process.env.ARA_API_BASE_URL ?? DEFAULT_BASE).replace(/\/+$/, "");
