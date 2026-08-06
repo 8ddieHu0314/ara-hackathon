@@ -66,7 +66,7 @@ export default async function PostDetail({
           >
             <div className="mb-3 flex items-center justify-between">
               <PlatformBadge platform={v.platform} />
-              <StatusPill status={v.status} />
+              {v.status !== "mocked" && <StatusPill status={v.status} />}
             </div>
             <div className="mb-4 whitespace-pre-wrap rounded-lg bg-[var(--background)] p-3 text-xs leading-relaxed text-zinc-300">
               {v.content}
